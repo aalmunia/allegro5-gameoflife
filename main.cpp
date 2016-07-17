@@ -1,4 +1,3 @@
-#include <ctime>
 #include <iostream>
 #include <random>
 #include <string>
@@ -167,6 +166,39 @@ bool isPatternStable(long int* iAliveHistory, short int iSize) {
 	}
 }
 
+bool areIdenticalCellMap(bool** pCells, bool** pNextCells, short int iAppWidth, short int iAppHeight) {
+	bool bReturn = true;
+	for (short int i = 0; i < iAppWidth; i++) {
+		for (short int j = 0; j < iAppHeight; j++) {
+			if (pCells[i][j] != pNextCells[i][j]) {
+				return false;
+			}
+		}
+	}
+	return bReturn;
+}
+
+// COPIED FROM http://stackoverflow.com/questions/4643512/replace-substring-with-another-substring-c
+
+std::string ReplaceString(std::string subject, const std::string& search,
+	const std::string& replace) {
+	size_t pos = 0;
+	while ((pos = subject.find(search, pos)) != std::string::npos) {
+		subject.replace(pos, search.length(), replace);
+		pos += replace.length();
+	}
+	return subject;
+}
+
+void ReplaceStringInPlace(std::string& subject, const std::string& search,
+	const std::string& replace) {
+	size_t pos = 0;
+	while ((pos = subject.find(search, pos)) != std::string::npos) {
+		subject.replace(pos, search.length(), replace);
+		pos += replace.length();
+	}
+}
+
 int main(short int argc, char** argv) {
 
 	al_init();
@@ -184,12 +216,15 @@ int main(short int argc, char** argv) {
 	short int iAppWidth = iDisplayWidth * 0.95f;
 	short int iAppHeight = iDisplayHeight * 0.95f;
 	short int iMarginHorizontal = (iDisplayWidth - iAppWidth) / 2;
-	short int iMarginVertical = (iDisplayHeight - iAppHeight) / 2;	
+	short int iMarginVertical = ((iDisplayHeight - iAppHeight) / 2);
 	int iGenerations = 0;
 	short int iFPS = 30;
 	float iLifeMin = 3.0f;
 	float iLifeMax = 37.0f;	
-	short int iFontSize = (iDisplayWidth > 1024) ? 10 : 8;
+	short int iFontSize = (iDisplayWidth > 1024) ? 12 : 10;
+	if (iDisplayWidth < 800) {
+		iFontSize = 8;
+	}
 	long int iSimulations = 1;
 
 	std::random_device rd;
@@ -204,22 +239,19 @@ int main(short int argc, char** argv) {
 	initCells(pCells, pNextGenCells, iAppWidth, iAppHeight, iLifeScarcity);
 
 	ALLEGRO_DISPLAY* pDisplay = al_create_display(iDisplayWidth, iDisplayHeight);	
-	ALLEGRO_EVENT_QUEUE* pQueue = al_create_event_queue();
-	ALLEGRO_EVENT_QUEUE* pKeyboardQueue = al_create_event_queue();
-	ALLEGRO_EVENT_QUEUE* pMouseQueue = al_create_event_queue();
+	ALLEGRO_EVENT_QUEUE* pQueue = al_create_event_queue();	
 	ALLEGRO_TIMER* pTimer = al_create_timer(1.0f / iFPS);
 	ALLEGRO_TIMER* pSecondBySecondTimer = al_create_timer(1.0f);
 	ALLEGRO_BITMAP* pBuffer = al_create_bitmap(iAppWidth, iAppHeight);
 	ALLEGRO_COLOR oBackgroundColor = al_map_rgb(0, 0, 0);
 	ALLEGRO_COLOR oCellColor = al_map_rgb(randr(150, 255), randr(150, 255), randr(150, 255));
-	ALLEGRO_FONT* oFont = al_load_ttf_font("Xcelsion.ttf", iFontSize, 0);
-	ALLEGRO_FONT* oFontLarge = al_load_ttf_font("Xcelsion.ttf", (iFontSize * 3), 0);
+	ALLEGRO_FONT* oFont = al_load_ttf_font("VeraMono.ttf", iFontSize, 0);
+	ALLEGRO_FONT* oFontLarge = al_load_ttf_font("VeraMono.ttf", (iFontSize * 3), 0);
 
 	al_inhibit_screensaver(true);
 	
 	al_register_event_source(pQueue, al_get_keyboard_event_source());
-	al_register_event_source(pQueue, al_get_mouse_event_source());
-	// al_register_event_source(pKeyboardQueue, al_get_mouse_event_source());
+	al_register_event_source(pQueue, al_get_mouse_event_source());	
 	al_register_event_source(pQueue, al_get_timer_event_source(pTimer));
 	al_register_event_source(pQueue, al_get_timer_event_source(pSecondBySecondTimer));
 	al_set_target_backbuffer(pDisplay);
@@ -230,26 +262,25 @@ int main(short int argc, char** argv) {
 	al_start_timer(pSecondBySecondTimer);
 
 	ALLEGRO_EVENT oEvent;
-	ALLEGRO_EVENT oKeyboardEvent;
-	ALLEGRO_EVENT oMouseEvent;
 
 	short int iBufferUsed = 0;
 	short int iBufferDrawn = 0;
 	bool bRedraw = false;
-	std::string sHeaderText_1 = "";
-	std::string sHeaderText_2 = "";
+	std::string sHeaderStatistics = "GEN  [GENXXXXX]     FPS  [FPSXXXXX]     CELLS  [CELLSXXXXX]    GENS/S  [GENSSXXXXX]    SCARCTY  [SCARXXXXX]    TIME  [TIMEXXXXX]";
+	std::string sHeaderStats = "";
+	/* std::string sHeaderText_2 = "";
 	std::string sHeaderText_3 = "";
 	std::string sHeaderText_4 = "";
 	std::string sHeaderText_5 = "";
-	std::string sHeaderText_6 = "";
+	std::string sHeaderText_6 = ""; */
 	std::string sCountdownText = "";
 	std::string sSimulations = "";
+	std::string sStats = "CELLS: ";
 
-	std::string sStats = "Total Cells: ";
 	sStats.append(std::to_string((iAppWidth * iAppHeight)));
-	sStats.append(", Cells size (in KB): ");
+	sStats.append(", MAP SIZE (KB): ");
 	sStats.append(std::to_string((iAppWidth * iAppHeight * sizeof(bool)) / 1024));
-	sStats.append("  (C)olor, (R)eload, (S)carcity, (F) +1 FPS, (G) -1 FPS, (ESC) Exit");
+	sStats.append("  (SPACE) Pause (C)olor, (R)eload, (S)carcity, (F) +1 FPS, (G) -1 FPS, (ESC) Exit");
 
 	long int iTotalAlive = 0;
 	int iPatternStableBuffer = (iFPS * 4);
@@ -274,9 +305,7 @@ int main(short int argc, char** argv) {
 	ALLEGRO_COLOR oRandColor = al_map_rgb(randr(0, 255), randr(0, 255), randr(0, 255));
 
 	while (true) {
-
-		al_get_next_event(pMouseQueue, &oMouseEvent);
-		al_get_next_event(pKeyboardQueue, &oKeyboardEvent);		
+		
 		al_wait_for_event(pQueue, &oEvent);
 
 		if (oEvent.type == ALLEGRO_EVENT_TIMER) {
@@ -288,33 +317,24 @@ int main(short int argc, char** argv) {
 					nextGeneration(pCells, pNextGenCells, iAppWidth, iAppHeight, iTotalAlive);
 					al_set_target_backbuffer(pDisplay);
 					al_clear_to_color(oBackgroundColor);
-
 					al_draw_bitmap(pBuffer, iMarginHorizontal, iMarginVertical, 0);
-					sHeaderText_1 = "GENERATION ";					
-					sHeaderText_1.append(std::to_string(iGenerations));
-					sHeaderText_2 = "FPS: ";
-					sHeaderText_2.append(std::to_string(iFPS));
-					sHeaderText_3 = "CELLS ALIVE: ";
-					sHeaderText_3.append(std::to_string(iTotalAlive));
-					sHeaderText_4 = "GENERATIONS / SEC: ";
+
+					sHeaderStats = ReplaceString(sHeaderStatistics, "[GENXXXXX]", std::to_string(iGenerations));
+					sHeaderStats = ReplaceString(sHeaderStats, "[FPSXXXXX]", std::to_string(iFPS));
+					sHeaderStats = ReplaceString(sHeaderStats, "[CELLSXXXXX]", std::to_string(iTotalAlive));
+					sHeaderStats = ReplaceString(sHeaderStats, "[SCARXXXXX]", std::to_string(iLifeScarcity));
+					sHeaderStats = ReplaceString(sHeaderStats, "[TIMEXXXXX]", std::to_string(iSecondsRunning));
 					if (iGenerations > 0 && iSecondsRunning > 0) {
-						sHeaderText_4.append(std::to_string(iGenerations / iSecondsRunning));
+						sHeaderStats = ReplaceString(sHeaderStats, "[GENSSXXXXX]", std::to_string(iGenerations / iSecondsRunning));
 					}
-					sHeaderText_5 = "ELAPSED TIME ";
-					sHeaderText_5.append(std::to_string(iSecondsRunning));
-					sHeaderText_6 = "SCARCITY: ";
-					sHeaderText_6.append(std::to_string(iLifeScarcity));
-					sSimulations = "SIMULATIONS: ";
+					else {
+						sHeaderStats = ReplaceString(sHeaderStats, "[GENSSXXXXX]", "0");
+					}					
+					sSimulations = "SIMS ";
 					sSimulations.append(std::to_string(iSimulations));
-
 					int iLengthSims = al_get_text_width(oFont, sSimulations.c_str());
-
-					al_draw_text(oFont, oCellColor, 5.0f, 1.0f, 0, sHeaderText_1.c_str());
-					al_draw_text(oFont, oCellColor, fPosText2, 1.0f, 0, sHeaderText_2.c_str());
-					al_draw_text(oFont, oCellColor, fPosText3, 1.0f, 0, sHeaderText_3.c_str());
-					al_draw_text(oFont, oCellColor, fPosText4, 1.0f, 0, sHeaderText_4.c_str());
-					al_draw_text(oFont, oCellColor, fPosText5, 1.0f, 0, sHeaderText_5.c_str());
-					al_draw_text(oFont, oCellColor, fPosText6, 1.0f, 0, sHeaderText_6.c_str());
+					int iLengthStats = al_get_text_width(oFont, sHeaderStats.c_str());
+					al_draw_text(oFont, oCellColor, ((iAppWidth - iLengthStats) / 2), 1.0f, 0, sHeaderStats.c_str());
 					al_draw_text(oFont, oCellColor, (iDisplayWidth - (iLengthSims + 25.0f)), (iAppHeight + iMarginVertical + 5.0f), 0, sSimulations.c_str());
 					al_draw_text(oFont, oCellColor, 25.0f, (iAppHeight + iMarginVertical + 5.0f), 0, sStats.c_str());
 
@@ -446,9 +466,7 @@ int main(short int argc, char** argv) {
 
 	}	// End main loop
 
-	al_destroy_event_queue(pQueue);
-	al_destroy_event_queue(pKeyboardQueue);
-	al_destroy_event_queue(pMouseQueue);
+	al_destroy_event_queue(pQueue);	
 	al_destroy_display(pDisplay);
 
 	delete iTotalPatternStable;
